@@ -1,0 +1,422 @@
+<!DOCTYPE html><html lang="es"><head>    <meta charset="UTF-8">    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Malajes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {            background: transparent !important;            margin: 0;            padding: 20px;            display: flex;            justify-content: center;            align-items: center;            min-height: 100vh;            overflow: hidden;        }
+        ._0xM1 {            width: 100%;            max-width: 480px;            background: transparent;            border: none;            overflow: hidden;            position: relative;        }
+        ._0xT2 {            font-size: 32px;            text-align: center;            padding: 25px 15px;            font-weight: 800;            font-family: 'Orbitron';            background: linear-gradient(90deg, #f00, #fff, #f00);            background-size: 200% auto;            -webkit-background-clip: text;            -webkit-text-fill-color: transparent;            animation: sh 3s linear infinite;            text-shadow: 0 0 10px rgba(255,0,0,0.5);        }
+        @keyframes sh {            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }        }
+        #canvas-globe {            width: 100%;            height: 320px;            background: transparent;            position: relative;            cursor: grab;        }
+        #canvas-globe:active { cursor: grabbing; }
+        #canvas-globe canvas { display: block; }
+        ._0xL3 {            position: absolute;            top: 10px;            left: 10px;            right: 10px;            bottom: 10px;
+            background: rgba(0,0,0,0.7);            backdrop-filter: blur(5px);
+            border-radius: 15px;            padding: 15px;
+            display: none;            overflow-y: auto;
+            z-index: 20;
+            border: 1px solid rgba(255,0,0,0.3);        }
+        .location-item {            padding: 10px;
+            display: flex;            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 13px;
+            color: #fff;
+            font-weight: 600;
+            font-family: 'Poppins';        }
+        .location-item img { width: 28px; height: auto; }
+        .location-tag {            position: absolute;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            text-shadow: 0 1px 4px #000;
+            text-transform: uppercase;
+            z-index: 10;
+            font-family: 'Poppins';
+            white-space: nowrap;        }
+        .location-tag img { width: 20px; height: auto; }
+        ._0xH4 {            padding: 20px;            text-align: center;            background: transparent;            font-family: 'Poppins';        }
+        #time {            font-size: 20px;            font-weight: 600;            font-family: 'Orbitron';            color: #fff;            display: block;            margin-bottom: 15px;            text-shadow: 0 0 5px #000;        }
+        ._0xP5 {            background: rgba(0,0,0,0.3);            padding: 8px 30px;            border-radius: 30px;            border: 2px solid #f00;            display: inline-flex;            align-items: center;            gap: 10px;            cursor: pointer;            color: #f00;            font-weight: 800;            user-select: none;            transition: 0.2s;        }
+        ._0xP5:hover { background: rgba(255,0,0,0.12); }
+        #visNum {            color: #09f;            font-size: 18px;            min-width: 25px;            text-align: center;        }
+        #date {            font-size: 12px;            margin-top: 10px;            color: #fff;            text-transform: uppercase;            text-shadow: 0 0 5px #000;        }
+        #firebaseStatus {            margin-top: 8px;            font-size: 9px;            font-family: 'Poppins';            font-weight: 700;            letter-spacing: 1px;            color: #00ff66;            text-shadow: 0 0 5px rgba(0,255,100,0.5);            opacity: 0.8;        }
+        #firebaseStatus.offline {            color: #ff3333;            text-shadow: 0 0 5px rgba(255,0,0,0.5);        }
+        #firebaseStatus.loading {            color: #ffaa00;            text-shadow: 0 0 5px rgba(255,170,0,0.5);        }    </style></head>
+<body>
+<div id="root">
+    <div class="_0xM1">
+        <div class="_0xT2">Radio Malajes</div>
+        <div id="canvas-globe">
+            <div class="_0xL3" id="locationData"></div>
+        </div>
+        <div class="_0xH4">
+            <span id="time">--:--:--</span>
+            <div class="_0xP5" id="trigList">Visitas <span id="visNum">00</span></div>
+            <div id="firebaseStatus" class="loading">● CONECTANDO</div>
+            <div id="date">Cargando...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* =========================================================   FIREBASE========================================================= */
+const firebaseConfig = {
+    apiKey: "AIzaSyDizkHA4ac6nDyn_W4VPFgPMEUskwnMMVI",
+    authDomain: "morenos-8d654.firebaseapp.com",
+    projectId: "morenos-8d654",
+    storageBucket: "morenos-8d654.firebasestorage.app",
+    messagingSenderId: "255854994253",
+    appId: "1:255854994253:web:87567047a6589579080d04",
+    measurementId: "G-FC3TZ2GCNR"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* =========================================================   CONFIGURACIÓN========================================================= */
+const COLLECTION = "morenos-8d654";
+const HEARTBEAT = 10000;
+const TIMEOUT = 30000;
+
+/* =========================================================   SESIÓN========================================================= */
+const myId = "M_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now().toString(36);
+const myRef = db.collection(COLLECTION).doc(myId);
+
+let heartbeatTimer = null;
+let allUsers = [];
+
+/* =========================================================   ESTADO========================================================= */
+function setStatus(type, text) {
+    const status = document.getElementById("firebaseStatus");
+    status.className = "";
+    if (type === "offline") { status.classList.add("offline"); }
+    if (type === "loading") { status.classList.add("loading"); }
+    status.textContent = "● " + text;
+}
+
+/* =========================================================   BOTÓN VISITAS========================================================= */
+document.getElementById("trigList").onclick = function() {
+    const list = document.getElementById("locationData");
+    list.style.display = list.style.display === "block" ? "none" : "block";
+};
+
+/* =========================================================   THREE.JS========================================================= */
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 480 / 320, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true
+});
+
+renderer.setClearColor(0x000000, 0);
+renderer.setSize(480, 320);
+document.getElementById("canvas-globe").appendChild(renderer.domElement);
+
+/* =========================================================   ESFERA========================================================= */
+const earthTexture = new THREE.TextureLoader().load("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg");
+const globe = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 64, 64),
+    new THREE.MeshPhongMaterial({
+        map: earthTexture,
+        emissive: new THREE.Color("#1db954"),
+        emissiveIntensity: 0.1
+    })
+);
+
+scene.add(globe);
+scene.add(new THREE.AmbientLight(0xffffff, 1.3));
+camera.position.z = 3;
+
+/* =========================================================   ARRASTRE========================================================= */
+let markers = [];
+let isDragging = false;
+let mouseX = 0;
+const canvasCont = document.getElementById("canvas-globe");
+
+canvasCont.onmousedown = function(e) {
+    isDragging = true;
+    mouseX = e.clientX;
+};
+
+window.onmouseup = function() {
+    isDragging = false;
+};
+
+canvasCont.onmousemove = function(e) {
+    if (!isDragging) { return; }
+    globe.rotation.y += (e.clientX - mouseX) * 0.005;
+    mouseX = e.clientX;
+};
+
+/* =========================================================   MARCADORES========================================================= */
+function clearMarkers() {
+    markers.forEach(function(marker) {
+        globe.remove(marker.dot);
+        if (marker.tag && marker.tag.parentNode) {
+            marker.tag.parentNode.removeChild(marker.tag);
+        }
+    });
+    markers = [];
+}
+
+function createMarker(user) {
+    let lat = Number(user.lat);
+    let lng = Number(user.lng);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return;
+    }
+
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = (lng + 180) * Math.PI / 180;
+
+    const pos = new THREE.Vector3(
+        -1.02 * Math.sin(phi) * Math.cos(theta),
+        1.02 * Math.cos(phi),
+        1.02 * Math.sin(phi) * Math.sin(theta)
+    );
+
+    const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 12, 12),
+        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+    );
+
+    dot.position.copy(pos);
+    globe.add(dot);
+
+    const tag = document.createElement("div");
+    tag.className = "location-tag";
+
+    const text = document.createElement("span");
+    text.textContent = (user.city || "Ubicación") + ", " + (user.country || "");
+
+    const flag = document.createElement("img");
+    flag.src = "https://flagcdn.com/w20/" + (user.code || "es").toLowerCase() + ".png";
+    flag.alt = user.country || "";
+
+    tag.appendChild(text);
+    tag.appendChild(flag);
+
+    document.getElementById("canvas-globe").appendChild(tag);
+
+    markers.push({
+        dot: dot,
+        tag: tag,
+        pos: pos
+    });
+}
+
+/* =========================================================   TIMESTAMP========================================================= */
+function getTimestamp(value) {
+    if (!value) { return 0; }
+    if (typeof value.toMillis === "function") { return value.toMillis(); }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : 0;
+}
+
+/* =========================================================   VISITANTES ACTIVOS========================================================= */
+function updateVisitors() {
+    const now = Date.now();
+    const activeUsers = allUsers.filter(function(user) {
+        const timestamp = getTimestamp(user.t);
+        return (timestamp > 0 && now - timestamp < TIMEOUT);
+    });
+
+    const count = activeUsers.length;
+    document.getElementById("visNum").textContent = count < 10 ? "0" + count : String(count);
+
+    const list = document.getElementById("locationData");
+    list.innerHTML = "";
+
+    activeUsers.forEach(function(user) {
+        const item = document.createElement("div");
+        item.className = "location-item";
+
+        const flag = document.createElement("img");
+        flag.src = "https://flagcdn.com/w40/" + (user.code || "es").toLowerCase() + ".png";
+        flag.alt = user.country || "";
+
+        const text = document.createElement("span");
+        text.textContent = (user.city || "Ubicación") + ", " + (user.country || "");
+
+        item.appendChild(flag);
+        item.appendChild(text);
+        list.appendChild(item);
+    });
+
+    clearMarkers();
+
+    activeUsers.forEach(function(user) {
+        createMarker(user);
+    });
+}
+
+/* =========================================================   OBTENER UBICACIÓN EXACTA========================================================= */
+async function getLocation() {
+    try {
+        const response = await fetch("https://ipwho.is/", { cache: "no-store" });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success !== false && data.latitude != null && data.longitude != null) {
+                return {
+                    city: String(data.city || "Ubicación"),
+                    country: String(data.country || ""),
+                    code: String(data.country_code || "es").toLowerCase(),
+                    lat: Number(data.latitude),
+                    lng: Number(data.longitude)
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("ipwho.is fallo", e);
+    }
+
+    try {
+        const response = await fetch("https://ipapi.co/json/", { cache: "no-store" });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.latitude != null && data.longitude != null) {
+                return {
+                    city: String(data.city || "Ubicación"),
+                    country: String(data.country_name || ""),
+                    code: String(data.country_code || "es").toLowerCase(),
+                    lat: Number(data.latitude),
+                    lng: Number(data.longitude)
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("ipapi.co fallo", e);
+    }
+
+    return {
+        city: "Desconocido",
+        country: "",
+        code: "es",
+        lat: null,
+        lng: null
+    };
+}
+
+/* =========================================================   CONECTAR========================================================= */
+async function connect() {
+    setStatus("loading", "CONECTANDO");
+
+    try {
+        const location = await getLocation();
+        const now = Number(Date.now());
+
+        await myRef.set({
+            city: location.city,
+            country: location.country,
+            code: location.code,
+            lat: location.lat,
+            lng: location.lng,
+            t: now,
+            created: now
+        });
+
+        setStatus("online", "CONECTADO");
+
+        heartbeatTimer = setInterval(async function() {
+            try {
+                await myRef.update({
+                    t: Number(Date.now())
+                });
+                setStatus("online", "CONECTADO");
+            } catch (error) {
+                console.error("Heartbeat:", error);
+                setStatus("offline", "SIN CONEXIÓN");
+            }
+        }, HEARTBEAT);
+
+    } catch (error) {
+        console.error("Firebase:", error);
+        setStatus("offline", "SIN CONEXIÓN");
+    }
+}
+
+/* =========================================================   FIRESTORE========================================================= */
+db.collection(COLLECTION).onSnapshot(
+    function(snapshot) {
+        allUsers = [];
+        snapshot.forEach(function(doc) {
+            allUsers.push(doc.data());
+        });
+        updateVisitors();
+    },
+    function(error) {
+        console.error("Firestore:", error);
+        setStatus("offline", "SIN CONEXIÓN");
+    }
+);
+
+/* =========================================================   REVISAR VISITANTES========================================================= */
+setInterval(updateVisitors, 5000);
+
+/* =========================================================   SALIR========================================================= */
+function disconnect() {
+    if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+    }
+    myRef.delete().catch(function() {});
+}
+
+window.addEventListener("pagehide", disconnect);
+window.addEventListener("beforeunload", disconnect);
+
+/* =========================================================   RELOJ========================================================= */
+function updateClock() {
+    const now = new Date();
+    document.getElementById("time").textContent = now.toLocaleTimeString("es-ES");
+    document.getElementById("date").textContent = now.toLocaleDateString(
+        "es-ES",
+        { weekday: "long", day: "numeric", month: "long" }
+    );
+}
+
+updateClock();
+setInterval(updateClock, 1000);
+
+/* =========================================================   ANIMACIÓN========================================================= */
+const worldPos = new THREE.Vector3();
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    if (!isDragging) {
+        globe.rotation.y += 0.0025;
+    }
+
+    markers.forEach(function(marker) {
+        marker.dot.getWorldPosition(worldPos);
+
+        const projected = worldPos.clone().project(camera);
+
+        marker.tag.style.display = "flex";
+
+        marker.tag.style.left = ((projected.x * 0.5 + 0.5) * 480) + "px";
+        marker.tag.style.top = ((projected.y * -0.5 + 0.5) * 320) + "px";
+    });
+
+    renderer.render(scene, camera);
+}
+
+/* =========================================================   ARRANCAR========================================================= */
+connect();
+animate();
+</script>
+</body></html>
